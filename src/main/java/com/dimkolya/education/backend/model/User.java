@@ -7,75 +7,101 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import lombok.ToString;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.Instant;
 import java.util.Collection;
-import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Getter
 @Setter
-@Table(name = "users",
+@ToString
+@Table(
+        name = "users",
         indexes = {
-                @Index(columnList = "username", unique = true),
-                @Index(columnList = "email", unique = true),
                 @Index(columnList = "creationTime"),
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = "username"),
-                @UniqueConstraint(columnNames = "email"),
-        })
+        }
+)
 public class User implements UserDetails {
+    public static final int MIN_USERNAME_LENGTH = 3;
+    public static final int MAX_USERNAME_LENGTH = 20;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
     @NotBlank
-    @Size(min = 2, max = 20)
-    @Pattern(regexp = "^[a-zA-Z0-9_]{2,20}$",
-            message = "Username must be 2 to 20 characters long and can only contain letters, numbers, and underscores.")
-    @Column(nullable = false, unique = true, length = 20)
+    @Size(
+            min = MIN_USERNAME_LENGTH,
+            max = MAX_USERNAME_LENGTH,
+            message = "{user.username.size}"
+    )
+    @Pattern(
+            regexp = "^[a-zA-Z0-9_]+$",
+            message = "{user.username.pattern}"
+    )
+    @Column(
+            nullable = false,
+            unique = true,
+            length = 20
+    )
     private String username;
 
     @Email
-    @Column(nullable = false, unique = true, length = 254)
+    @Column(
+            nullable = false,
+            unique = true,
+            length = 254
+    )
     private String email;
 
-    @Column(nullable = false, length = 60)
+    @Column(
+            nullable = false,
+            length = 60
+    )
     private String passwordHash;
 
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
+    @Column(
+            nullable = false,
+            updatable = false,
+            insertable = false
+    )
     private Instant creationTime;
 
-    @UpdateTimestamp
-    @Column(nullable = false)
+    @Column(
+            nullable = false,
+            updatable = false,
+            insertable = false
+    )
     private Instant updateTime;
 
     @Column(nullable = false)
-    @ColumnDefault("false")
     private boolean emailVerified = false;
 
     @Column(nullable = false)
-    @ColumnDefault("false")
     private boolean blocked = false;
 
-    @Column(nullable = false)
-    @Enumerated(EnumType.STRING)
-    private Role role = Role.ROLE_USER;
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "users_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles;
 
     public User() {
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority(role.name()));
+        return roles.stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -101,11 +127,5 @@ public class User implements UserDetails {
     @Override
     public boolean isEnabled() {
         return true;
-    }
-
-    public enum Role {
-        ROLE_USER,
-        ROLE_EDITOR,
-        ROLE_ADMIN
     }
 }
