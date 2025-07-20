@@ -37,6 +37,8 @@ jobs:
         key: ${{ secrets.VPS_PRIVATE_KEY }}
         script: |
           cd /root/cucumber-education
+          export JWT_PRIVATE_KEY="${{ secrets.JWT_PRIVATE_KEY }}"
+          export JWT_PUBLIC_KEY="${{ secrets.JWT_PUBLIC_KEY }}"
           docker-compose pull
           docker-compose up -d
           docker image prune -f
